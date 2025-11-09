@@ -349,6 +349,7 @@ void handleDownload() {
   
   File downloadFile = LittleFS.open(filename, "r");
   if (downloadFile) {
+    server.sendHeader("Content-Disposition", "attachment; filename=" + filename.substring(1));
     server.streamFile(downloadFile, "application/octet-stream"); // Kirim sebagai binary stream
     downloadFile.close();
   } else {
@@ -389,7 +390,6 @@ void sendFile() {
       server.handleClient(); // Tetap layani web server saat menunggu
     }
     if (ackReceivedFlag && lastAckReceived == 0) { // ACK untuk info paket berhasil
-      ackReceivedFlag = false;
       break;
     }
     Serial.println("[SND] Timeout atau ACK salah, kirim ulang PKT_INFO_FILE...");
@@ -415,7 +415,7 @@ void sendFile() {
     for (int retry = 0; retry < 5; retry++) { // Coba kirim & tunggu ACK 5 kali
       esp_now_send(peerAddress, (uint8_t*)&dataPacket, sizeof(dataPacket));
       Serial.print(">"); // Progres pengiriman chunk
-      
+
       unsigned long startTime = millis();
       while (!ackReceivedFlag && (millis() - startTime < 500)) { // Tunggu ACK max 0.5 detik
         delay(1);
@@ -423,7 +423,6 @@ void sendFile() {
       }
 
       if (ackReceivedFlag && lastAckReceived == currentSendingChunk) { // ACK yang benar diterima
-        ackReceivedFlag = false; // Reset flag
         currentSendingChunk++;   // Lanjut ke chunk berikutnya
         sentBytes += dataPacket.dataSize;
         break; // Keluar dari loop retry, lanjut ke chunk berikutnya
