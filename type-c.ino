@@ -546,7 +546,7 @@ void handleFileList() {
                 + filename 
                 + "</span><span class='filesize'>" 
                 + file.size() 
-                + "</span></div>";
+                + " kb</span></div>";
         page += "<div class='file-actions'><a href='/download?name=" 
                 + filename 
                 + "' class='btn btn-secondary'>Download</a>";
@@ -680,3 +680,4 @@ void sendFile() {
   file.close();
   Serial.println("[SND] File berhasil dikirim.");
 }
+
