@@ -277,19 +277,116 @@ void loop() {
 
 // --- 8. IMPLEMENTASI FUNGSI WEB SERVER ---
 void handleRoot() {
-  String html = "<!DOCTYPE html><html><head><title>ESP32 File Transfer</title>";
-  html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
-  html += "<style>body{font-family:sans-serif;} button{padding:10px;margin:5px;}</style>";
-  html += "</head><body><h1>ESP32 File Transfer</h1>";
-  html += "<h2>1. Upload File ke ESP32 Ini:</h2>";
-  html += "<form method='POST' action='/upload' enctype='multipart/form-data'>";
-  html += "<input type='file' name='upload'><br>";
-  html += "<button type='submit'>Upload ke Memori ESP32</button>";
-  html += "</form>";
-  html += "<h2>2. Kelola File:</h2>";
-  html += "<p><a href='/files'><button>Lihat/Kirim/Download File</button></a></p>";
-  html += "</body></html>";
-  server.send(200, "text/html", html);
+  const char html[] PROGMEM = R"rawliteral(
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>ESP32 Local Comms</title>
+        <meta name='viewport' content='width=device-width, initial-scale=1'>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+          }
+          .container {
+            max-width: 700px;
+            margin: 20px auto;
+            padding: 25px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+          }
+          h1 {
+            color: #1a237e;
+            text-align: center;
+            margin-bottom: 10px;
+            font-weight: 600;
+          }
+          h2 {
+            color: #3949ab;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 5px;
+            margin-top: 30px;
+            font-weight: 500;
+          }
+          .card {
+            background-color: #fcfcfc;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+          }
+          p {
+            line-height: 1.6;
+          }
+          button, .btn {
+            display: inline-block;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 14px 20px;
+            margin: 10px 0 5px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+          }
+          button:active, .btn:active {
+            transform: scale(0.98);
+          }
+          button[type='submit'] {
+            background-color: #28a745;
+          }
+          button[type='submit']:hover {
+            background-color: #218838;
+          }
+          .btn-primary {
+            background-color: #007bff;
+            text-align: center;
+          }
+          .btn-primary:hover {
+            background-color: #0056b3;
+          }
+          input[type='file'] {
+            display: block;
+            margin-top: 10px;
+            width: 100%;
+            padding: 10px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background: #fff;
+          }
+        </style>
+      </head>
+      <body>
+        <div class='container'>
+          <h1>Sistem Komunikasi Lokal ESP32</h1>
+          <div class='card'>
+            <h2>1. Upload File ke ESP32</h2>
+            <form method='POST' action='/upload' enctype='multipart/form-data'>
+              <p>Pilih file dari perangkat Anda untuk di-upload ke memori internal ESP32 ini.</p>
+              <input type='file' name='upload' required>
+              <button type='submit'>Upload ke Memori</button>
+            </form>
+          </div>
+          <div class='card'>
+            <h2>2. Kelola File</h2>
+            <p>Lihat atau hapus file yang ada, kirim ke ESP32 lain, atau download ke perangkat Anda.</p>
+            <a href='/files' class='btn btn-primary'>Kelola File</a>
+          </div>
+        </div>
+      </body>
+    </html>
+  )rawliteral";
+
+  server.send_P(200, "text/html", html);
 }
 
 void handleFileUpload() {
@@ -314,14 +411,129 @@ void handleFileUpload() {
 }
 
 void handleFileList() {
-  String html = "<!DOCTYPE html><html><head><title>File List</title>";
-  html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
-  html += "<style>body{font-family:sans-serif;} button{padding:8px;margin:3px;}</style>";
-  html += "</head><body><h1>Daftar File di ESP32</h1><ul>";
+  String page;
+  page.reserve(8192); //siapkan 8 kb agar tidak sering realokasi
+
+  const char header[] PROGMEM = R"rawliteral(
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Daftar File</title>
+      <meta name='viewport' content='width=device-width, initial-scale=1'>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          background-color: #f0f2f5;
+          color: #333;
+          margin: 0;
+          padding: 20px;
+        }
+        .container {
+          max-width: 900px;
+          margin: 20px auto;
+          padding: 25px;
+          background-color: #fff;
+          border-radius: 10px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        h1 {
+          color: #1a237e;
+          text-align: center;
+          margin-bottom: 25px;
+          font-weight: 600;
+        }
+        button, .btn {
+          display: inline-block;
+          padding: 8px 14px;
+          margin: 3px;
+          font-size: 14px;
+          font-weight: 600;
+          color: #fff;
+          border: none;
+          border-radius: 5px;
+          text-decoration: none;
+          cursor: pointer;
+          transition: background-color 0.3s ease;
+        }
+        .btn-primary { background-color: #007bff; }
+        .btn-primary:hover { background-color: #0056b3; }
+        .btn-secondary { background-color: #6c757d; }
+        .btn-secondary:hover { background-color: #5a6268; }
+        .btn-danger { background-color: #dc3545; }
+        .btn-danger:hover { background-color: #c82333; }
+        .btn-back {
+          background-color: #ffc107;
+          color: #212529;
+          padding: 12px 18px;
+        }
+        .btn-back:hover { background-color: #e0a800; }
+        .file-list {
+          list-style: none;
+          padding: 0;
+          margin-top: 20px;
+        }
+        .file-item {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: space-between;
+          align-items: center;
+          padding: 15px;
+          border-bottom: 1px solid #eee;
+        }
+        .file-item:nth-child(odd) {
+          background-color: #f9f9f9;
+        }
+        .file-item:last-child { border-bottom: none; }
+        .file-info {
+          flex-grow: 1;
+          min-width: 200px;
+          word-break: break-all;
+          margin-right: 10px;
+        }
+        .file-info .filename {
+          font-weight: bold;
+          font-size: 1.1em;
+          color: #0056b3;
+        }
+        .file-info .filesize {
+          font-size: 0.9em;
+          color: #777;
+          display: block;
+          margin-top: 3px;
+        }
+        .file-actions {
+          flex-shrink: 0;
+          text-align: right;
+        }
+        .footer {
+          text-align: center;
+          margin-top: 30px;
+        }
+      </style>
+    </head>
+
+    <body>
+        <div class='container'>
+            <h1>Daftar File di ESP32</h1>
+
+            <ul class='file-list'>
+  )rawliteral";
+
+  const char footer[] PROGMEM = R"rawliteral(
+          </ul>
+          <div class='footer'>
+            <a href='/' class='btn btn-back'>Kembali ke Halaman Utama</a>
+          </div>
+        </div>
+      </body>
+    </html>
+  )rawliteral";
   
+  page += FPSTR(header);
+
   File root = LittleFS.open("/");
   if (!root || !root.isDirectory()) {
-    html += "<li>Gagal membuka direktori root!</li>";
+    page += "<li class='file-item'><div class='file-info'>Tidak ada file di memori.</div></li>";
   } else {
     File file = root.openNextFile();
     while (file) {
@@ -330,17 +542,32 @@ void handleFileList() {
         if (filename.startsWith("/")) {
           filename = filename.substring(1);
         } // Hapus '/' di awal
-        html += "<li>" + filename + " (" + file.size() + " bytes) ";
-        html += "<a href='/download?name=" + filename + "'><button>Download</button></a>";
-        html += "<a href='/sendfile?name=" + filename + "'><button>Kirim via ESP-NOW</button></a>";
-        html += "<a href='/delete?name=" + filename + "' onclick='return confirm(\"Yakin ingin menghapus " + filename + "?\");'><button class='delete'>Delete</button></a>";
-        html += "</li>";
+        page += "<li class='file-item'><div class='file-info'><span class='filename'>" 
+                + filename 
+                + "</span><span class='filesize'>" 
+                + file.size() 
+                + "</span></div>";
+        page += "<div class='file-actions'><a href='/download?name=" 
+                + filename 
+                + "' class='btn btn-secondary'>Download</a>";
+        page += "<a href='/sendfile?name=" 
+                + filename 
+                + "' class='btn btn-primary'>Kirim ESP-NOW</a>";
+        page += "<a href='/delete?name=" 
+                + filename 
+                + "' class='btn btn-danger' onclick='return confirm(\"Yakin ingin menghapus " 
+                + filename 
+                + "?\");'>Delete</a>";
+        page += "</div></li>";
       }
       file = root.openNextFile();
     }
   }
-  html += "</ul><p><a href='/'><button>Kembali ke Halaman Utama</button></a></p></body></html>";
-  server.send(200, "text/html", html);
+  root.close();
+
+  page += FPSTR(footer);
+
+  server.send(200, "text/html", page);
 }
 
 void handleDownload() {
